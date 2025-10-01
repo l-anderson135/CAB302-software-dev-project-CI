@@ -23,10 +23,11 @@ jobs:
       - name: Ensure Maven Wrapper
         run: |
           if [ ! -f mvnw ]; then
-            mvn -N wrapper -Dmaven=3.9.9
+            mvn -N org.apache.maven.plugins:maven-wrapper-plugin:3.2.0:wrapper -Dmaven=3.9.9
           fi
           chmod +x mvnw
-
+      
+      
 
       - name: Start headless display
         uses: pyvista/setup-headless-display-action@v3
