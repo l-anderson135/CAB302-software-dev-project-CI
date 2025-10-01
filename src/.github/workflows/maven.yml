@@ -1,0 +1,37 @@
+name: Java CI with Maven
+
+on:
+  push:
+    branches: [ "integration" ]
+  pull_request:
+    branches: [ "integration" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21 (Corretto)
+        uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: "corretto"
+          cache: maven
+
+      - name: Ensure Maven Wrapper
+        run: |
+          if [ ! -f mvnw ]; then
+            mvn -N wrapper -Dmaven=3.9.9
+          fi
+          chmod +x mvnw
+
+
+      - name: Start headless display
+        uses: pyvista/setup-headless-display-action@v3
+        with:
+          install: true
+
+      - name: Build with Maven
+        run: ./mvnw -B -e -DskipTests=false package
