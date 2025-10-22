@@ -54,14 +54,25 @@ jobs:
           if ! git ls-remote --exit-code --heads origin gh-pages &>/dev/null; then
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
+
+            # Remember where we were so we can return after bootstrapping
+            START_REF=$(git rev-parse --abbrev-ref HEAD)
+
             git checkout --orphan gh-pages
-            rm -rf .
+            # Clean index and working tree without trying to delete '.'
+            git reset --hard
+            git clean -fdx
+
+            # Put a placeholder so the first push creates the branch
             echo "<!doctype html><title>Docs</title><h1>Initializing gh-pages…</h1>" > index.html
             git add index.html
             git commit -m "Initialize gh-pages"
             git push origin gh-pages
-            git checkout -
+
+            # Go back to the build branch
+            git checkout "$START_REF"
           fi
+      
 
       - name: Publish Javadoc
         if: github.event_name == 'push' && github.ref == 'refs/heads/integration'
