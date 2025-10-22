@@ -2,14 +2,16 @@ name: Java CI with Maven
 
 on:
   push:
-    branches: [ "integration" ]
+    branches: [ "integration" ]   # <— your default branch
   pull_request:
     branches: [ "integration" ]
+
+permissions:
+  contents: write                 # allow pushing gh-pages
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
 
@@ -27,20 +29,54 @@ jobs:
           fi
           chmod +x mvnw
 
-
-
-      - name: Start headless display
+      - name: Headless display (JavaFX)
         uses: pyvista/setup-headless-display-action@v3
         with:
           install: true
 
-      - name: Build with Maven
+      - name: Build
         run: ./mvnw -B -e -DskipTests=false package
 
       - name: Generate Javadoc
-        run: mvn javadoc:javadoc
+        run: ./mvnw -B -e javadoc:javadoc
+
+      # sanity: show which folder actually has docs
+      - name: Show Javadoc tree
+        run: |
+          echo "target/docs/javadoc:"; ls -laR target/docs/javadoc || true
+          echo "target/site/apidocs:";  ls -laR target/site/apidocs  || true
+
+      # one-time: create gh-pages if missing
+      - name: Create gh-pages branch if missing
+        if: github.event_name == 'push' && github.ref == 'refs/heads/integration'
+        run: |
+          set -e
+          if ! git ls-remote --exit-code --heads origin gh-pages &>/dev/null; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git checkout --orphan gh-pages
+            rm -rf .
+            echo "<!doctype html><title>Docs</title><h1>Initializing gh-pages…</h1>" > index.html
+            git add index.html
+            git commit -m "Initialize gh-pages"
+            git push origin gh-pages
+            git checkout -
+          fi
 
       - name: Publish Javadoc
+        if: github.event_name == 'push' && github.ref == 'refs/heads/integration'
         uses: JamesIves/github-pages-deploy-action@v4
         with:
-            folder: target/docs/javadoc
+          branch: gh-pages
+          folder: target/docs/javadoc   # change to target/site/apidocs if that’s where yours land
+          clean: true
+
+      - name: Upload Javadoc artifact (fallback)
+        uses: actions/upload-artifact@v4
+        with:
+          name: javadoc
+          path: |
+            target/docs/javadoc
+            target/site/apidocs
+          if-no-files-found: warn
+          retention-days: 7
