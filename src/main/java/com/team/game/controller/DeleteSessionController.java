@@ -19,6 +19,13 @@ import java.util.List;
 import java.util.Optional;
 import java.util.ResourceBundle;
 
+/**
+ * Controller for the Delete Session view.
+ * <p>
+ * Allows users to select or manually enter a session ID to delete.
+ * Lists all saved game sessions for the logged-in user and delegates
+ * deletion logic to {@link GameService}.
+ */
 public class DeleteSessionController implements Initializable {
 
     private static final ZoneId LOCAL_TZ = ZoneId.of("Australia/Brisbane");
@@ -45,6 +52,11 @@ public class DeleteSessionController implements Initializable {
     private GameService gameService;
     private User currentUser;
 
+    /**
+     * JavaFX lifecycle hook.
+     * Initializes the game service and user references,
+     * loads the user's saved sessions, and sets up event listeners.
+     */
     @Override
     public void initialize(URL location, ResourceBundle resources) {
         gameService = Main.MenuApp.getGameService();
@@ -64,6 +76,10 @@ public class DeleteSessionController implements Initializable {
         });
     }
 
+    /**
+     * Loads all sessions belonging to the current user
+     * and populates the combo box with formatted session details.
+     */
     private void loadSessions() {
         if (gameService == null || currentUser == null) {
             showStatus("Error: Unable to load user data", false);
@@ -76,7 +92,7 @@ public class DeleteSessionController implements Initializable {
         for (GameSession session : sessions) {
             String startedLocal = session.getStartedAt().atZone(LOCAL_TZ).format(DT_FMT);
             String displayText = String.format("ID: %d | %s | Score: %d | Started: %s",
-                session.getId(), session.getMode(), session.getScore(), startedLocal);
+                    session.getId(), session.getMode(), session.getScore(), startedLocal);
             sessionItems.add(new SessionItem(session.getId(), displayText));
         }
 
@@ -91,6 +107,12 @@ public class DeleteSessionController implements Initializable {
         }
     }
 
+    /**
+     * Handles deletion of the selected or entered session.
+     * Displays a confirmation dialog before removing it via {@link GameService#deleteSession(int)}.
+     *
+     * @param actionEvent the originating UI event
+     */
     @FXML
     public void handleDelete(ActionEvent actionEvent) {
         int sessionId = getSelectedSessionId();
@@ -121,6 +143,11 @@ public class DeleteSessionController implements Initializable {
         }
     }
 
+    /**
+     * Reloads the list of sessions from the database and clears input fields.
+     *
+     * @param actionEvent the originating UI event
+     */
     @FXML
     public void handleRefresh(ActionEvent actionEvent) {
         System.out.println("Refreshing session list...");
@@ -130,12 +157,22 @@ public class DeleteSessionController implements Initializable {
         hideStatus();
     }
 
+    /**
+     * Closes the delete session window.
+     *
+     * @param actionEvent the originating UI event
+     */
     @FXML
     public void handleBack(ActionEvent actionEvent) {
         System.out.println("Back to menu");
         closeWindow();
     }
 
+    /**
+     * Retrieves the session ID from the combo box or text field.
+     *
+     * @return the selected/entered session ID, or -1 if invalid
+     */
     private int getSelectedSessionId() {
         SessionItem selectedItem = sessionComboBox.getValue();
         if (selectedItem != null) {
@@ -155,6 +192,12 @@ public class DeleteSessionController implements Initializable {
         return -1;
     }
 
+    /**
+     * Displays a styled status message.
+     *
+     * @param message   text to show
+     * @param isSuccess true for success styling, false for error styling
+     */
     private void showStatus(String message, boolean isSuccess) {
         statusLabel.setText(message);
         statusLabel.setVisible(true);
@@ -166,28 +209,43 @@ public class DeleteSessionController implements Initializable {
         }
     }
 
+    /**
+     * Hides the status label.
+     */
     private void hideStatus() {
         statusLabel.setVisible(false);
     }
 
+    /**
+     * Utility to close the current stage (window).
+     */
     private void closeWindow() {
         Stage stage = (Stage) backButton.getScene().getWindow();
         stage.close();
     }
 
+    /**
+     * Wrapper class for displaying session info in the combo box.
+     */
     public static class SessionItem {
         private int id;
         private String displayText;
 
+        /**
+         * @param id           the session ID
+         * @param displayText  formatted display string for the combo box
+         */
         public SessionItem(int id, String displayText) {
             this.id = id;
             this.displayText = displayText;
         }
 
+        /** @return the ID of this session */
         public int getId() {
             return id;
         }
 
+        /** @return formatted display text shown in the combo box */
         @Override
         public String toString() {
             return displayText;

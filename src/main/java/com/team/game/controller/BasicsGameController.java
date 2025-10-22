@@ -24,6 +24,14 @@ import java.util.Collections;
 import java.util.List;
 import java.util.ResourceBundle;
 
+/**
+ * Controller for the BASICS game screen.
+ * <p>
+ * Displays multiple-choice and numeric questions, manages per-question timers,
+ * records score/strikes, and coordinates persistence through {@link GameService}.
+ * A round is started and finished against a {@link GameSession} for the
+ * currently logged-in {@link User}.
+ */
 public class BasicsGameController implements Initializable {
     @FXML
     private Label scoreLabel;
@@ -79,6 +87,11 @@ public class BasicsGameController implements Initializable {
     private final int QUESTION_TIME = 30;
     private int timeRemaining = QUESTION_TIME;
 
+    /**
+     * JavaFX lifecycle hook.
+     * Wires dependencies (from Main), starts a session, loads questions,
+     * renders the first question, and binds button handlers.
+     */
     @Override
     public void initialize(URL location, ResourceBundle resources) {
         initializeFromLogin();
@@ -88,12 +101,22 @@ public class BasicsGameController implements Initializable {
         setupButtonActions();
     }
 
+    /**
+     * Allows tests to inject a service and user without going through the JavaFX login flow.
+     *
+     * @param service game service to use
+     * @param user    active user for the session
+     */
     // Method for testing or dependency injection
     public void setDependencies(GameService service, User user) {
         this.gameService = service;
         this.currentUser = user;
     }
 
+    /**
+     * Pulls references from the JavaFX launcher (Main.BasicsApp).
+     * Any failure here is logged and leaves the controller in a no-DB fallback mode.
+     */
     private void initializeFromLogin() {
         try {
             this.gameService = Main.BasicsApp.getGameService();
@@ -104,6 +127,10 @@ public class BasicsGameController implements Initializable {
         }
     }
 
+    /**
+     * Starts a new persisted BASICS round for the current user.
+     * Logs (but does not rethrow) failures to avoid crashing the UI.
+     */
     private void startGameSession() {
         if (gameService != null && currentUser != null) {
             try {
@@ -115,6 +142,10 @@ public class BasicsGameController implements Initializable {
         }
     }
 
+    /**
+     * Loads questions from {@link GameService}. If the service is unavailable,
+     * seeds a small in-memory fallback set so the screen remains usable.
+     */
     private void initializeQuestions() {
         if (gameService != null) {
             gameQuestions = new ArrayList<>(gameService.getBasicsQuestions());
@@ -154,6 +185,9 @@ public class BasicsGameController implements Initializable {
         System.out.println("Loaded " + gameQuestions.size() + " questions for basics game");
     }
 
+    /**
+     * Binds UI controls to their corresponding event handlers.
+     */
     private void setupButtonActions() {
         optionAButton.setOnAction(this::handleMultipleChoiceAnswer);
         optionBButton.setOnAction(this::handleMultipleChoiceAnswer);
@@ -163,6 +197,10 @@ public class BasicsGameController implements Initializable {
         nextButton.setOnAction(this::handleNextQuestion);
     }
 
+    /**
+     * Renders the current question and toggles UI for MCQ vs numeric mode.
+     * Starts (or restarts) the per-question timer. Ends the game when out of questions.
+     */
     private void displayCurrentQuestion() {
         if (currentQuestionIndex < gameQuestions.size()) {
             currentQuestion = gameQuestions.get(currentQuestionIndex);
@@ -199,6 +237,10 @@ public class BasicsGameController implements Initializable {
         }
     }
 
+    /**
+     * Starts a 30-second countdown for the current question and updates the progress bar.
+     * When the timer elapses, the question is marked as missed.
+     */
     private void startQuestionTimer() {
         timeRemaining = QUESTION_TIME;
         updateProgressBar();
@@ -220,6 +262,9 @@ public class BasicsGameController implements Initializable {
         questionTimer.play();
     }
 
+    /**
+     * Updates the progress bar and tint based on remaining time.
+     */
     private void updateProgressBar() {
         double progress = (double) timeRemaining / QUESTION_TIME;
         progressBar.setProgress(progress);
@@ -233,6 +278,10 @@ public class BasicsGameController implements Initializable {
         }
     }
 
+    /**
+     * Handles timeout for a question: increments strikes, saves a wrong attempt,
+     * shows the correct answer, and enables moving to the next question.
+     */
     private void handleTimeUp() {
         questionTimer.stop();
         feedbackLabel.setText("Time's up! The correct answer was: " + currentQuestion.getAnswer());
@@ -257,6 +306,9 @@ public class BasicsGameController implements Initializable {
         }
     }
 
+    /**
+     * Handles a click on a multiple-choice option and records the result.
+     */
     @FXML
     private void handleMultipleChoiceAnswer(ActionEvent event) {
         if (!gameActive) return;
@@ -280,6 +332,9 @@ public class BasicsGameController implements Initializable {
         nextButton.setDisable(false);
     }
 
+    /**
+     * Handles submission of a numeric answer and records the result.
+     */
     @FXML
     private void handleNumericAnswer(ActionEvent event) {
         if (!gameActive) return;
@@ -305,30 +360,86 @@ public class BasicsGameController implements Initializable {
         nextButton.setDisable(false);
     }
 
+    /**
+     * Compares a user answer with the expected answer.
+     * For MCQ, comparison is case/whitespace-insensitive.
+     * For numeric answers, allows a small tolerance when parsing as doubles.
+     *
+     * @param userInput      text entered or option chosen
+     * @param correctAnswer   expected answer
+     * @param isMultipleChoice true if MCQ, false if numeric
+     * @return true if considered correct
+     */
     // Method to check if an answer is correct
-    public boolean isAnswerCorrect(String userAnswer, String correctAnswer, boolean isMultipleChoice) {
+    public boolean isAnswerCorrect(String userInput, String correctAnswer, boolean isMultipleChoice) {
+        String uNorm = normalizeAnswer(userInput, isMultipleChoice);
+        String cNorm = normalizeAnswer(correctAnswer, isMultipleChoice);
+
         if (isMultipleChoice) {
-            return normalizeAnswer(userAnswer, true).equals(normalizeAnswer(correctAnswer, true));
+            return uNorm.equals(cNorm);
         } else {
-            try {
-                double userValue = Double.parseDouble(userAnswer.trim());
-                double correctValue = Double.parseDouble(correctAnswer.trim());
-                return Math.abs(userValue - correctValue) < 0.01;
-            } catch (NumberFormatException e) {
-                return userAnswer.trim().equalsIgnoreCase(correctAnswer.trim());
+            // decimal or fraction with tolerance
+            Double u = parseNumber(uNorm);
+            Double c = parseNumber(cNorm);
+            if (u != null && c != null) {
+                // +/- 0.01 tolerance
+                return Math.abs(u - c) <= 1e-2;
             }
+            return uNorm.equals(cNorm);
         }
     }
 
+    /**
+     * Normalizes answers for flexible matching.
+     * MCQ: lowercase and strip whitespace. Numeric/free text: trim only.
+     */
     // Method to normalize answers for flexible matching
     private String normalizeAnswer(String answer, boolean isMultipleChoice) {
+        if (answer == null) {
+            return "";
+        }
+        answer = answer.trim();
+
         if (isMultipleChoice) {
             return answer.toLowerCase().replaceAll("\\s+", "");
         } else {
-            return answer.trim();
+            return answer.replaceAll("\\answer*/\\answer*", "/").trim();
         }
     }
 
+    private Double parseNumber(String s) {
+        if (s == null || s.isBlank()) {
+            return null;
+        }
+
+        if (s.matches("-?\\d+(?:\\.\\d+)?/\\s*-?\\d+(?:\\.\\d+)?")) {
+            String[] ab = s.split("/");
+            try {
+                double a = Double.parseDouble(ab[0].trim());
+                double b = Double.parseDouble(ab[1].trim());
+                if (b == 0.0) {
+                    return null;
+                }
+                return a / b;
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+
+        // decimal
+        try {
+            return Double.parseDouble(s);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Updates score/strikes, persists result, and styles feedback.
+     * Ends the game on three strikes.
+     *
+     * @param isCorrect whether the submitted answer was correct
+     */
     private void processAnswer(boolean isCorrect) {
         if (isCorrect) {
             score++;
@@ -363,10 +474,16 @@ public class BasicsGameController implements Initializable {
         }
     }
 
+    /**
+     * Strips the "X: " prefix from a button label to get the answer text.
+     */
     private String extractAnswerFromButton(String buttonText) {
         return buttonText.substring(3);
     }
 
+    /**
+     * Highlights the correct option on screen for an MCQ.
+     */
     private void highlightCorrectAnswer() {
         if (currentQuestion.getOptions() != null) {
             List<String> options = currentQuestion.getOptions();
@@ -384,6 +501,9 @@ public class BasicsGameController implements Initializable {
         }
     }
 
+    /**
+     * Resets option button styles to default before showing the next question.
+     */
     private void resetOptionButtons() {
         String defaultStyle = "";
         optionAButton.setStyle(defaultStyle);
@@ -392,6 +512,9 @@ public class BasicsGameController implements Initializable {
         optionDButton.setStyle(defaultStyle);
     }
 
+    /**
+     * Advances to the next question and refreshes the UI.
+     */
     @FXML
     private void handleNextQuestion(ActionEvent event) {
         currentQuestionIndex++;
@@ -399,14 +522,26 @@ public class BasicsGameController implements Initializable {
         displayCurrentQuestion();
     }
 
+    /**
+     * Updates the on-screen score label.
+     */
     private void updateScoreDisplay() {
         scoreLabel.setText("Score: " + score);
     }
 
+    /**
+     * Updates the on-screen strikes label.
+     */
     private void updateStrikesDisplay() {
         strikesLabel.setText("Strikes: " + strikes + "/3");
     }
 
+    /**
+     * Finalizes the round: disables inputs, persists completion, stops timers,
+     * and switches the Next button into a New Game button.
+     *
+     * @param message final message to display to the user
+     */
     private void endGame(String message) {
         gameActive = false;
 
@@ -441,6 +576,10 @@ public class BasicsGameController implements Initializable {
         System.out.println("Basics game ended: " + message);
     }
 
+    /**
+     * Resets UI and in-memory state, shuffles questions, starts a fresh persisted round,
+     * and returns the Next button to its normal behavior.
+     */
     @FXML
     private void handleNewGame(ActionEvent event) {
         score = 0;
@@ -468,3 +607,5 @@ public class BasicsGameController implements Initializable {
         displayCurrentQuestion();
     }
 }
+
+//changes

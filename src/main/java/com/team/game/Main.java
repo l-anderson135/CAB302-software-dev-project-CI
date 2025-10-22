@@ -20,20 +20,30 @@ import java.util.Scanner;
 
 import main.java.com.team.game.ui.Windows;
 
-
+/**
+ * Application entry point. Boots either the console flow (for quick testing)
+ * or the JavaFX login → menu GUIs, wiring a {@link GameService} backed by {@link GameStore}.
+ */
 public class Main {
+
+    /** Local timezone for console timestamps. */
     private static final ZoneId LOCAL_TZ = ZoneId.of("Australia/Brisbane"); // or ZoneId.systemDefault()
+
+    /** Console-friendly timestamp format with zone suffix. */
     private static final DateTimeFormatter DT_FMT =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss z");
 
-
-
+    /**
+     * Starts the program. Use {@code --console} to run the text UI; otherwise launches JavaFX.
+     *
+     * @param args command-line args; first may be {@code --console} to run the console UI
+     */
     public static void main(String[] args) {
         GameStore store = new GameStore();
         GameService svc = new GameService(store);
 
         if (args.length > 0 && "--console".equals(args[0])) {
-            runConsole(svc);  // old console stuff in here
+            runConsole(svc);
         } else {
             Windows.openLogin(svc, user -> {
                 Windows.openMenu(svc, user);
@@ -41,7 +51,12 @@ public class Main {
         }
     }
 
-
+    /**
+     * Prompts the user to select a game mode in the console.
+     *
+     * @param in scanner reading from {@code System.in}
+     * @return chosen {@link GameMode}, or {@code null} if cancelled/invalid
+     */
     private static GameMode chooseMode(Scanner in) {
         System.out.println("Pick game mode:");
         System.out.println("1) BASICS");
@@ -59,6 +74,14 @@ public class Main {
         };
     }
 
+    /**
+     * Console-only round flow: picks mode, launches the GUI for GUI-backed modes,
+     * otherwise plays a Q&A round in the terminal with 3-strike rules.
+     *
+     * @param in   scanner for user input
+     * @param svc  game service façade for sessions and scoring
+     * @param user authenticated user
+     */
     private static void startRoundFlow(Scanner in, GameService svc, User user) {
         GameMode mode = chooseMode(in);
         if (mode == null) return;
@@ -170,9 +193,11 @@ public class Main {
         System.out.println("Round finished. Your high score (" + mode + ") = " + hs);
     }
 
-
-
-    // login/rego first
+    /**
+     * Console login/registration + main loop dispatcher.
+     *
+     * @param svc game service façade
+     */
     private static void runConsole(GameService svc) {
         System.out.println("cwd = " + System.getProperty("user.dir"));
         System.out.println("db  = data/game.db");
@@ -206,8 +231,12 @@ public class Main {
         runConsoleMenu(svc, user);
     }
 
-
-    // Gabby's console ui (do we wanna replace all this with one unified GUI eventually?)
+    /**
+     * Console menu loop for CRUD actions, rounds, and leaderboard.
+     *
+     * @param svc  game service façade
+     * @param user current authenticated user (may be updated after username change)
+     */
     private static void runConsoleMenu(GameService svc, User user) {
         Scanner in = new Scanner(System.in);
 
@@ -299,24 +328,41 @@ public class Main {
         }
     }
 
-    // JavaFX Application class for Menu GUI
+    /**
+     * JavaFX Application for the main menu screen.
+     * Loads {@code /menu/menu-main.fxml}.
+     */
     public static class MenuApp extends Application {
         private static GameService gameService;
         private static User currentUser;
 
+        /**
+         * Injects the active service and user before launch.
+         *
+         * @param service game service façade
+         * @param user    authenticated user
+         */
         public static void setUserData(GameService service, User user) {
             gameService = service;
             currentUser = user;
         }
 
+        /** @return injected {@link GameService} */
         public static GameService getGameService() {
             return gameService;
         }
 
+        /** @return current authenticated {@link User} */
         public static User getCurrentUser() {
             return currentUser;
         }
 
+        /**
+         * Shows the menu stage.
+         *
+         * @param primaryStage primary JavaFX stage
+         * @throws Exception if FXML cannot be loaded
+         */
         @Override
         public void start(Stage primaryStage) throws Exception {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/menu/menu-main.fxml"));
@@ -330,24 +376,41 @@ public class Main {
         }
     }
 
-    // JavaFX Application class for TRIG GUI
+    /**
+     * JavaFX Application for the Trigonometry game.
+     * Loads {@code /trigofun/trigofun-main.fxml}.
+     */
     public static class TrigoApp extends Application {
         private static GameService gameService;
         private static User currentUser;
 
+        /**
+         * Injects the active service and user before launch.
+         *
+         * @param service game service façade
+         * @param user    authenticated user
+         */
         public static void setUserData(GameService service, User user) {
             gameService = service;
             currentUser = user;
         }
 
+        /** @return injected {@link GameService} */
         public static GameService getGameService() {
             return gameService;
         }
 
+        /** @return current authenticated {@link User} */
         public static User getCurrentUser() {
             return currentUser;
         }
 
+        /**
+         * Shows the Trig game stage.
+         *
+         * @param primaryStage primary JavaFX stage
+         * @throws Exception if FXML cannot be loaded
+         */
         @Override
         public void start(Stage primaryStage) throws Exception {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/trigofun/trigofun-main.fxml"));
@@ -361,24 +424,41 @@ public class Main {
         }
     }
 
-    // JavaFX Application class for Basics GUI
+    /**
+     * JavaFX Application for the Basics game.
+     * Loads {@code /basicsgame/basics-game.fxml}.
+     */
     public static class BasicsApp extends Application {
         private static GameService gameService;
         private static User currentUser;
 
+        /**
+         * Injects the active service and user before launch.
+         *
+         * @param service game service façade
+         * @param user    authenticated user
+         */
         public static void setUserData(GameService service, User user) {
             gameService = service;
             currentUser = user;
         }
 
+        /** @return injected {@link GameService} */
         public static GameService getGameService() {
             return gameService;
         }
 
+        /** @return current authenticated {@link User} */
         public static User getCurrentUser() {
             return currentUser;
         }
 
+        /**
+         * Shows the Basics game stage.
+         *
+         * @param primaryStage primary JavaFX stage
+         * @throws Exception if FXML cannot be loaded
+         */
         @Override
         public void start(Stage primaryStage) throws Exception {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/basicsgame/basics-game.fxml"));
@@ -389,23 +469,40 @@ public class Main {
             primaryStage.setScene(scene);
             primaryStage.setResizable(false);
             primaryStage.show();
-
-
         }
     }
 
-    // javafx app class for Target game GUI
+    /**
+     * JavaFX Application for the Target game.
+     * Loads {@code /target/target-main.fxml}.
+     */
     public static class TargetApp extends Application {
         private static GameService gameService;
         private static User currentUser;
 
+        /**
+         * Injects the active service and user before launch.
+         *
+         * @param svc  game service façade
+         * @param user authenticated user
+         */
         public static void setUserData(GameService svc, User user) {
             gameService = svc;
             currentUser = user;
         }
+
+        /** @return injected {@link GameService} */
         public static GameService getGameService() { return gameService; }
+
+        /** @return current authenticated {@link User} */
         public static User getCurrentUser() { return currentUser; }
 
+        /**
+         * Shows the Target game stage.
+         *
+         * @param stage primary JavaFX stage
+         * @throws Exception if FXML cannot be loaded
+         */
         @Override
         public void start(Stage stage) throws Exception {
             FXMLLoader loader = new FXMLLoader(TargetApp.class.getResource("/target/target-main.fxml"));
@@ -416,24 +513,33 @@ public class Main {
         }
     }
 
-
-
-
-
-    // TRIG
+    /**
+     * Launches the Trig GUI on the JavaFX thread via {@link Windows}.
+     *
+     * @param svc  game service façade
+     * @param user authenticated user
+     */
     private static void launchTrigoGUI(GameService svc, User user) {
         main.java.com.team.game.ui.Windows.openTrig(svc, user);
     }
 
-    // BASICS
+    /**
+     * Launches the Basics GUI (hooked here for parity with other modes).
+     *
+     * @param svc  game service façade
+     * @param user authenticated user
+     */
     private static void launchBasicsGUI(GameService svc, User user) {
+        // Intentionally left to be wired (similar to Trig/Target) via Windows helper.
     }
 
-    // TARGET
+    /**
+     * Launches the Target GUI on the JavaFX thread via {@link Windows}.
+     *
+     * @param svc  game service façade
+     * @param user authenticated user
+     */
     private static void launchTargetGUI(GameService svc, User user) {
         main.java.com.team.game.ui.Windows.openTarget(svc, user);
     }
-
-
-
 }

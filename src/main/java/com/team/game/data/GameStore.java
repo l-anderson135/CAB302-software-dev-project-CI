@@ -11,11 +11,21 @@ import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
 
+/**
+ * Data access layer for users and game sessions.
+ * <p>
+ * Owns schema creation and all CRUD/queries against the SQLite DB via {@link Database}.
+ * This class keeps SQL in one place and returns simple model types.
+ */
 public final class GameStore {
 
+    /** Constructs the store and ensures the schema exists. */
     public GameStore() { initSchema(); } // create tables if missing
 
-
+    /**
+     * Creates the required tables and indexes if they do not already exist.
+     * Ensures referential integrity for sessions → users.
+     */
     private void initSchema() {
         String users = """
           CREATE TABLE IF NOT EXISTS users (
@@ -51,6 +61,15 @@ public final class GameStore {
     }
 
     // ---- AUTH  ----
+
+    /**
+     * Creates a user with a unique (case-insensitive) username.
+     *
+     * @param username desired username
+     * @param password plaintext password (stored as-is)
+     * @return the created {@link User}
+     * @throws IllegalStateException if the username already exists
+     */
     public User createUser(String username, char[] password) {
         try (var c = Database.open()) {
             // ensure unique (case-insensitive)
@@ -77,6 +96,11 @@ public final class GameStore {
         } catch (SQLException e) { throw new RuntimeException(e); }
     }
 
+    /**
+     * Authenticates a user by case-insensitive username and plaintext password match.
+     *
+     * @return {@link Optional} of the {@link User} if credentials are valid, otherwise empty
+     */
     public Optional<User> authenticate(String username, char[] password) {
         try (var c = Database.open();
              var ps = c.prepareStatement(
@@ -95,6 +119,10 @@ public final class GameStore {
     }
 
     // ---- USERS ----
+
+    /**
+     * Lists all users ordered alphabetically by username.
+     */
     public List<User> listUsers() {
         var out = new ArrayList<User>();
         try (var c = Database.open();
@@ -105,6 +133,11 @@ public final class GameStore {
         } catch (SQLException e) { throw new RuntimeException(e); }
     }
 
+    /**
+     * Updates a user's username (case-insensitive uniqueness enforced).
+     *
+     * @throws IllegalStateException if the new username is already taken
+     */
     public void updateUsername(int userId, String newUsername) {
         try (var c = Database.open()) {
             try (var chk = c.prepareStatement("SELECT 1 FROM users WHERE LOWER(username)=LOWER(?) AND id<>?")) {
@@ -117,6 +150,9 @@ public final class GameStore {
         } catch (SQLException e) { throw new RuntimeException(e); }
     }
 
+    /**
+     * Updates a user's password (stored as plaintext).
+     */
     public void updatePassword(int userId, char[] newPassword) {
         try (var c = Database.open();
              var ps = c.prepareStatement("UPDATE users SET password=? WHERE id=?")) {
@@ -126,6 +162,11 @@ public final class GameStore {
         } catch (SQLException e) { throw new RuntimeException(e); }
     }
 
+    /**
+     * Deletes a user by ID. Cascades to sessions by FK constraint.
+     *
+     * @return true if a row was deleted
+     */
     public boolean deleteUser(int userId) {
         try (var c = Database.open();
              var ps = c.prepareStatement("DELETE FROM users WHERE id=?")) {
@@ -135,6 +176,12 @@ public final class GameStore {
     }
 
     // ---- SESSIONS ----
+
+    /**
+     * Starts a new game session for the given user and mode.
+     *
+     * @return the newly created {@link GameSession}
+     */
     public GameSession startSession(int userId, GameMode mode) {
         try (var c = Database.open()) {
             int id;
@@ -157,6 +204,9 @@ public final class GameStore {
         } catch (SQLException e) { throw new RuntimeException(e); }
     }
 
+    /**
+     * Increments score by one for an in-progress session.
+     */
     public void submitCorrect(int sessionId) {
         try (var c = Database.open();
              var ps = c.prepareStatement("UPDATE game_session SET score = score + 1 WHERE id=? AND completed=0")) {
@@ -165,6 +215,9 @@ public final class GameStore {
         } catch (SQLException e) { throw new RuntimeException(e); }
     }
 
+    /**
+     * Increments strikes for an in-progress session; auto-completes when strikes ≥ 3.
+     */
     public void submitWrong(int sessionId) {
         try (var c = Database.open()) {
             try (var inc = c.prepareStatement("UPDATE game_session SET strikes = strikes + 1 WHERE id=? AND completed=0")) {
@@ -185,6 +238,9 @@ public final class GameStore {
         } catch (SQLException e) { throw new RuntimeException(e); }
     }
 
+    /**
+     * Marks a session as completed and stamps {@code ended_at}.
+     */
     public void finishSession(int sessionId) {
         try (var c = Database.open();
              var ps = c.prepareStatement("UPDATE game_session SET completed=1, ended_at=CURRENT_TIMESTAMP WHERE id=?")) {
@@ -193,6 +249,9 @@ public final class GameStore {
         } catch (SQLException e) { throw new RuntimeException(e); }
     }
 
+    /**
+     * Lists sessions for a user, newest first (by start time, then ID to break ties).
+     */
     public List<GameSession> listSessionsByUser(int userId) {
         var out = new ArrayList<GameSession>();
         String sql = """
@@ -208,6 +267,11 @@ public final class GameStore {
         } catch (SQLException e) { throw new RuntimeException(e); }
     }
 
+    /**
+     * Deletes a session by ID.
+     *
+     * @return true if a row was deleted
+     */
     public boolean deleteSession(int sessionId) {
         try (var c = Database.open(); var ps = c.prepareStatement("DELETE FROM game_session WHERE id=?")) {
             ps.setInt(1, sessionId);
@@ -216,6 +280,12 @@ public final class GameStore {
     }
 
     // ---- QUERIES ----
+
+    /**
+     * Returns a user’s high score for a given mode across completed sessions.
+     *
+     * @return {@link OptionalInt} containing the max score, or empty if none
+     */
     public OptionalInt getHighScore(int userId, GameMode mode) {
         try (var c = Database.open();
              var ps = c.prepareStatement(
@@ -233,6 +303,13 @@ public final class GameStore {
         } catch (SQLException e) { throw new RuntimeException(e); }
     }
 
+    /**
+     * Builds a leaderboard for a mode using each user’s highest completed-session score.
+     *
+     * @param mode  game mode to rank
+     * @param limit max number of rows to return (min 1)
+     * @return ordered list of {@link ScoreRow} by descending high score
+     */
     public List<ScoreRow> leaderboard(GameMode mode, int limit) {
         String sql = """
             SELECT u.id AS user_id, u.username, MAX(s.score) AS high_score
@@ -261,6 +338,8 @@ public final class GameStore {
     }
 
     // ---- mappers ----
+
+    /** Maps a {@link ResultSet} row to a {@link User}. */
     private static User mapUser(ResultSet rs) throws SQLException {
         return new User(
                 rs.getInt("id"),
@@ -268,6 +347,7 @@ public final class GameStore {
                 rs.getTimestamp("registered_at").toInstant());
     }
 
+    /** Maps a {@link ResultSet} row to a {@link GameSession}. */
     private static GameSession mapSession(ResultSet rs) throws SQLException {
         Timestamp endTs = rs.getTimestamp("ended_at");
         return new GameSession(

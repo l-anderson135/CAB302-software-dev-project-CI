@@ -8,36 +8,41 @@
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
 
+<?import java.net.URL?>
+
 <AnchorPane xmlns="http://javafx.com/javafx/21"
             xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="main.java.com.team.game.controller.BasicsGameController">
     <children>
         <VBox spacing="10" AnchorPane.topAnchor="12" AnchorPane.leftAnchor="12" AnchorPane.rightAnchor="12" AnchorPane.bottomAnchor="12">
+            <stylesheets>
+                <URL value="@../styles/target.css"/>
+            </stylesheets>
             <Label text="Basics Game" style="-fx-font-size: 20px; -fx-font-weight: bold;"/>
             <HBox spacing="20">
-                <Label fx:id="scoreLabel" text="Score: 0"/>
-                <Label fx:id="strikesLabel" text="Strikes: 0 / 3"/>
-                <Label fx:id="feedbackLabel" text="Ready..."/>
+                <Label fx:id="scoreLabel" text="Score: 0" styleClass="hud"/>
+                <Label fx:id="strikesLabel" text="Strikes: 0 / 3" styleClass="hud"/>
+                <Label fx:id="feedbackLabel" text="Ready..." styleClass="status"/>
             </HBox>
 
             <!-- Question Display -->
-            <Label fx:id="questionLabel" text="Question will appear here" style="-fx-font-size: 14px; -fx-wrap-text: true;"/>
+            <Label fx:id="questionLabel" text="Question will appear here" style="-fx-font-size: 14px; -fx-wrap-text: true;" styleClass="question"/>
 
             <!-- Multiple Choice Options -->
             <HBox spacing="8" alignment="CENTER">
-                <Button fx:id="optionAButton" text="A: Option A" minWidth="120" visible="false"/>
-                <Button fx:id="optionBButton" text="B: Option B" minWidth="120" visible="false"/>
+                <Button fx:id="optionAButton" text="A: Option A" minWidth="120" visible="false" styleClass="newgame"/>
+                <Button fx:id="optionBButton" text="B: Option B" minWidth="120" visible="false" styleClass="newgame"/>
             </HBox>
             <HBox spacing="8" alignment="CENTER">
-                <Button fx:id="optionCButton" text="C: Option C" minWidth="120" visible="false"/>
-                <Button fx:id="optionDButton" text="D: Option D" minWidth="120" visible="false"/>
+                <Button fx:id="optionCButton" text="C: Option C" minWidth="120" visible="false" styleClass="newgame"/>
+                <Button fx:id="optionDButton" text="D: Option D" minWidth="120" visible="false" styleClass="newgame"/>
             </HBox>
 
             <!-- Numeric Input -->
             <HBox spacing="8" alignment="CENTER">
                 <Label text="Your answer:" visible="false"/>
                 <TextField fx:id="numericAnswerField" promptText="Enter numeric answer" prefWidth="120" visible="false"/>
-                <Button fx:id="submitNumericButton" text="Submit" visible="false"/>
+                <Button fx:id="submitNumericButton" text="Submit" visible="false" styleClass="fire"/>
             </HBox>
 
             <!-- Timer Progress Bar -->
@@ -45,7 +50,7 @@
 
             <!-- Control Buttons -->
             <HBox spacing="8" alignment="CENTER">
-                <Button fx:id="nextButton" text="Next Question" onAction="#handleNextQuestion"/>
+                <Button fx:id="nextButton" text="Next Question" onAction="#handleNextQuestion" styleClass="next"/>
             </HBox>
         </VBox>
     </children>

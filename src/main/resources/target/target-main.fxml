@@ -10,27 +10,32 @@
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
 
+<?import java.net.URL?>
+
 <AnchorPane xmlns="http://javafx.com/javafx/21"
             xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="main.java.com.team.game.controller.TargetGameController">
     <children>
         <VBox spacing="10" AnchorPane.topAnchor="12" AnchorPane.leftAnchor="12" AnchorPane.rightAnchor="12" AnchorPane.bottomAnchor="12">
-            <Label text="Target Game" style="-fx-font-size: 20px; -fx-font-weight: bold;"/>
+            <stylesheets>
+                <URL value="@../styles/target.css"/>
+            </stylesheets>
+            <Label text="Target Game" alignment="CENTER" maxWidth="Infinity" styleClass="title"/>
             <HBox spacing="20">
-                <Label fx:id="scoreLabel" text="Score: 0"/>
-                <Label fx:id="strikesLabel" text="Strikes: 0 / 3"/>
-                <Label fx:id="statusLabel" text="Ready…"/>
+                <Label fx:id="scoreLabel" text="Score: 0" styleClass="hud"/>
+                <Label fx:id="strikesLabel" text="Strikes: 0 / 3" styleClass="hud"/>
+                <Label fx:id="statusLabel" text="Ready…" styleClass="status"/>
             </HBox>
             <Separator/>
-            <Label fx:id="questionLabel" text="Question will appear here"/>
+            <Label fx:id="questionLabel" text="Question will appear here" styleClass="question"/>
             <HBox spacing="8">
-                <Label text="Enter launch speed v (m/s):"/>
+                <Label text="Enter launch speed v (m/s):" styleClass="hud"/>
                 <TextField fx:id="answerField" promptText="e.g. 22.8" prefWidth="120"/>
-                <Button fx:id="fireBtn" text="Fire" onAction="#handleFire"/>
-                <Button fx:id="nextBtn" text="Next" onAction="#handleNext" disable="true"/>
+                <Button fx:id="fireBtn" text="Fire" onAction="#handleFire" styleClass="fire"/>
+                <Button fx:id="nextBtn" text="Next" onAction="#handleNext" disable="true" styleClass="next"/>
 
-                <Button fx:id="newGameBtn" text="New Game" onAction="#handleNewGame" disable="true"/>
-                <Button fx:id="returnBtn" text="Return to Menu" onAction="#handleReturnToMenu" disable="true"/>
+                <Button fx:id="newGameBtn" text="New Game" onAction="#handleNewGame" disable="true" styleClass="newgame"/>
+                <Button fx:id="returnBtn" text="Return to Menu" onAction="#handleReturnToMenu" disable="true" styleClass="return"/>
             </HBox>
 
             <Separator/>

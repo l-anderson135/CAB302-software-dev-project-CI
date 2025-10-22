@@ -1,6 +1,5 @@
 package main.java.com.team.game.data;
 
-
 import main.java.com.team.game.model.GameMode;
 import main.java.com.team.game.model.GameSession;
 import main.java.com.team.game.model.ScoreRow;
@@ -17,12 +16,23 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+/**
+ * Integration tests for {@link GameStore} backed by the real SQLite DB.
+ * <p>
+ * Uses a temporary working directory and clears all tables between tests.
+ * Verifies schema creation, user auth and updates, session lifecycle,
+ * high score queries, leaderboard ranking, ordering, and foreign key behavior.
+ */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class GameStoreDatabaseTest {
 
     private static Path tempRoot;
     private static GameStore store;
 
+    /**
+     * Creates a temp working directory, initializes the DB (via {@link Database}),
+     * constructs a {@link GameStore}, and truncates all tables once before the suite.
+     */
     @BeforeAll
     static void setupWorkingDirAndInit() throws Exception {
         tempRoot = Files.createTempDirectory("cab302-dbtests-");
@@ -32,9 +42,15 @@ public class GameStoreDatabaseTest {
         truncateAll();
     }
 
+    /**
+     * Clears all tables after each test to guarantee isolation.
+     */
     @AfterEach
     void cleanBetweenTests() throws Exception { truncateAll(); }
 
+    /**
+     * Utility: removes all rows from {@code users} and {@code game_session}.
+     */
     private static void truncateAll() throws SQLException {
         try (Connection c = Database.open()) {
             c.createStatement().execute("DELETE FROM game_session");
@@ -42,6 +58,9 @@ public class GameStoreDatabaseTest {
         }
     }
 
+    /**
+     * Verifies the schema (tables) were created by {@link GameStore#GameStore()}.
+     */
     @Test @Order(1)
     void testSchemaWasCreated() throws Exception {
         try (Connection c = Database.open()) {
@@ -50,6 +69,9 @@ public class GameStoreDatabaseTest {
         }
     }
 
+    /**
+     * Ensures users are listed in alphabetical order and registration timestamps look sane.
+     */
     @Test @Order(2)
     void testCreateUserAndListUsers_orderedByUsername() {
         store.createUser("bob", "pw".toCharArray());
@@ -68,6 +90,9 @@ public class GameStoreDatabaseTest {
         }
     }
 
+    /**
+     * Validates case-insensitive uniqueness on usernames.
+     */
     @Test @Order(3)
     void testUsernameUniqueness_caseInsensitive() {
         store.createUser("Alice", "x".toCharArray());
@@ -76,6 +101,9 @@ public class GameStoreDatabaseTest {
         assertTrue(ex.getMessage().toLowerCase().contains("taken"));
     }
 
+    /**
+     * Checks username/password authentication including case-insensitive username match.
+     */
     @Test @Order(4)
     void testAuthenticate_successAndFailure() {
         store.createUser("sam", "123".toCharArray());
@@ -85,6 +113,9 @@ public class GameStoreDatabaseTest {
         assertTrue(store.authenticate("unknown", "123".toCharArray()).isEmpty());
     }
 
+    /**
+     * Ensures updateUsername enforces uniqueness and can successfully change non-conflicting names.
+     */
     @Test @Order(5)
     void testUpdateUsername_conflictAndSuccess() {
         User u1 = store.createUser("eva", "x".toCharArray());
@@ -99,6 +130,9 @@ public class GameStoreDatabaseTest {
         assertTrue(listed.stream().anyMatch(u -> "michael".equals(u.getUsername())));
     }
 
+    /**
+     * Verifies password update changes the credential used by authenticate().
+     */
     @Test @Order(6)
     void testUpdatePassword() {
         User u = store.createUser("pat", "old".toCharArray());
@@ -109,6 +143,9 @@ public class GameStoreDatabaseTest {
         assertTrue(store.authenticate("pat", "new".toCharArray()).isPresent());
     }
 
+    /**
+     * Confirms that deleting a user cascades and removes their sessions (FK ON DELETE CASCADE).
+     */
     @Test @Order(7)
     void testDeleteUser_cascadesSessions() {
         User u = store.createUser("cascadee", "pw".toCharArray());
@@ -123,6 +160,9 @@ public class GameStoreDatabaseTest {
         assertEquals(0, store.listSessionsByUser(u.getId()).size());
     }
 
+    /**
+     * Exercises the session lifecycle: start → submit (correct/wrong) → auto-complete at 3 strikes.
+     */
     @Test @Order(8)
     void testStartSubmitFinishSession_flowAndStrikesAutoComplete() {
         User u = store.createUser("runner", "pw".toCharArray());
@@ -150,6 +190,9 @@ public class GameStoreDatabaseTest {
         assertNotNull(after.getEndedAt());
     }
 
+    /**
+     * Ensures finishSession() sets completed=1 and stamps an end time.
+     */
     @Test @Order(9)
     void testFinishSession_setsCompletedAndEndTime() {
         User u = store.createUser("finisher", "pw".toCharArray());
@@ -162,6 +205,9 @@ public class GameStoreDatabaseTest {
         assertNotNull(reloaded.getEndedAt());
     }
 
+    /**
+     * Validates ordering by started time desc (and ID to break ties).
+     */
     @Test @Order(10)
     void testListSessionsByUser_sortedByStartedDesc() throws InterruptedException {
         User u = store.createUser("chronos", "pw".toCharArray());
@@ -175,6 +221,9 @@ public class GameStoreDatabaseTest {
         assertEquals(s1.getId(), list.get(1).getId());
     }
 
+    /**
+     * Confirms deleteSession() returns true and removes the record.
+     */
     @Test @Order(11)
     void testDeleteSession_returnsTrueWhenDeleted() {
         User u = store.createUser("deleter", "pw".toCharArray());
@@ -185,6 +234,9 @@ public class GameStoreDatabaseTest {
         assertEquals(0, store.listSessionsByUser(u.getId()).size());
     }
 
+    /**
+     * Verifies getHighScore() returns empty when none exist and updates to the correct max value.
+     */
     @Test @Order(12)
     void testGetHighScore_emptyAndValue() {
         User u = store.createUser("scorer", "pw".toCharArray());
@@ -204,6 +256,9 @@ public class GameStoreDatabaseTest {
         assertEquals(2, hs.getAsInt());
     }
 
+    /**
+     * Ensures leaderboard is per-mode, sorted by high score desc, and respects the limit.
+     */
     @Test @Order(13)
     void testLeaderboard_sortedAndLimited_perMode() {
         User u1 = store.createUser("lb_alice", "pw".toCharArray());
@@ -231,10 +286,12 @@ public class GameStoreDatabaseTest {
         List<ScoreRow> limited = store.leaderboard(GameMode.BASICS, 1);
         assertEquals(1, limited.size());
         assertEquals("lb_alice", limited.get(0).getUsername());
-
         assertEquals(3, limited.get(0).getHighScore());
     }
 
+    /**
+     * Confirms SQLite foreign_keys pragma is ON for every connection opened by {@link Database}.
+     */
     @Test @Order(14)
     void testForeignKeysPragmaOn() throws Exception {
         try (Connection c = Database.open();

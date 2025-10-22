@@ -16,8 +16,18 @@ import main.java.com.team.game.model.User;
 import main.java.com.team.game.service.GameService;
 import main.java.com.team.game.target.TargetPhysics;
 
+import javafx.application.Platform;
+import javafx.scene.input.KeyCode;
+
 import java.util.Random;
 
+/**
+ * Controller for the TARGET physics mini-game.
+ * <p>
+ * Generates projectile scenarios (angle, wall distance, target height) and asks the user
+ * to compute a launch speed {@code v}. Animates the projectile, checks for a hit, and
+ * records score/strikes. Persists progress via {@link GameService} and {@link GameSession}.
+ */
 public class TargetGameController {
 
     @FXML private Label scoreLabel;
@@ -36,15 +46,18 @@ public class TargetGameController {
     private GameSession session;
 
     private final Random rng = new Random();
+
+    // In-round state
     private int score = 0;
     private int strikes = 0;
 
     private boolean roundActive = false;
     private boolean animating = false;
 
-    private final double ppm = 50.0;
-    private final double g = 9.8;
-    private final double wallX_px = 700.0;
+    // World constants / parameters
+    private final double ppm = 50.0;            // pixels per meter
+    private final double g = 9.8;               // gravity (m/s^2)
+    private double wallX_px;                    // wall position in pixels
     private final double groundMargin = 40.0;
     private final double ballRadius_px = 8.0;
     private final double targetRadius_px = 14.0;
@@ -52,6 +65,7 @@ public class TargetGameController {
     private static final double ANGLE_MIN_DEG = 30.0;
     private static final double ANGLE_MAX_DEG = 60.0;
 
+    // Current scenario variables
     private double angleDeg;
     private double angleRad;
 
@@ -60,17 +74,22 @@ public class TargetGameController {
     private double targetY_m;
     private double correctV;
 
+    // Animation state
     private AnimationTimer timer;
     private long lastNanos;
     private double t;
     private double vUser;
 
+    /**
+     * JavaFX lifecycle hook. Wires the service and current user from {@code Main.TargetApp},
+     * starts a session if possible, prepares UI state, and binds Enter key to fire/next.
+     */
     @FXML
     private void initialize() {
         try {
             this.gameService = Main.TargetApp.getGameService();
             this.currentUser = Main.TargetApp.getCurrentUser();
-        }catch (Throwable ignored) {}
+        } catch (Throwable ignored) {}
 
         if (gameService != null && currentUser != null) {
             session = gameService.startRound(currentUser, GameMode.TARGET);
@@ -84,8 +103,24 @@ public class TargetGameController {
 
         updateHud();
         newRound();
+
+        Platform.runLater(() -> {
+            canvas.getScene().setOnKeyPressed(e -> {
+                if (e.getCode() == KeyCode.ENTER) {
+                    if (fireBtn.isVisible() && !fireBtn.isDisabled()) {
+                        fireBtn.fire();
+                    } else if (nextBtn.isVisible() && !nextBtn.isDisabled()) {
+                        nextBtn.fire();
+                    }
+                }
+            });
+        });
     }
 
+    /**
+     * Parses the user's speed input and starts the projectile animation.
+     * Validates presence, numeric format, and positivity.
+     */
     @FXML
     private void handleFire() {
         if (!roundActive || animating) {
@@ -93,10 +128,7 @@ public class TargetGameController {
         }
 
         String text = answerField.getText();
-
-        if (text == null) {
-            text = "";
-        }
+        if (text == null) text = "";
         text = text.trim();
 
         if (text.isEmpty()) {
@@ -119,6 +151,9 @@ public class TargetGameController {
         startAnimation();
     }
 
+    /**
+     * Proceeds to the next round if no animation is running.
+     */
     @FXML
     private void handleNext() {
         if (animating) {
@@ -127,6 +162,9 @@ public class TargetGameController {
         newRound();
     }
 
+    /**
+     * Resets score/strikes, starts a fresh session, and enables gameplay controls.
+     */
     @FXML
     private void handleNewGame() {
         score = 0;
@@ -146,22 +184,30 @@ public class TargetGameController {
         newRound();
     }
 
+    /**
+     * Closes the Target game window and returns to the previous screen.
+     */
     @FXML
     private void handleReturnToMenu() {
         Stage stage = (Stage) canvas.getScene().getWindow();
-
         if (stage != null) {
             stage.close();
         }
     }
 
+    /**
+     * Generates a new target scenario. Randomizes wall position, angle, and target height,
+     * computes the correct speed, resets UI state, and draws the world.
+     */
     private void newRound() {
         if (strikes >= 3) {
-
             endGame("3 strikes reached.");
             return;
         }
 
+        wallX_px = 500.0 + rng.nextDouble() * 300.0;
+
+        // Angle selection and feasibility clamping
         angleDeg = ANGLE_MIN_DEG + rng.nextDouble() * (ANGLE_MAX_DEG - ANGLE_MIN_DEG);
         angleRad = Math.toRadians(angleDeg);
 
@@ -214,6 +260,12 @@ public class TargetGameController {
         drawWorld();
     }
 
+    /**
+     * Finalizes a single round (after animation stops), updates score/strikes,
+     * persists the result, and triggers end-of-game if needed.
+     *
+     * @param wasHit true if the projectile hit the target; false otherwise
+     */
     private void endRound(boolean wasHit) {
         roundActive = false;
         animating = false;
@@ -241,6 +293,12 @@ public class TargetGameController {
         }
     }
 
+    /**
+     * Ends the game, disables controls, stops animation, finishes the session,
+     * and enables "New Game" / "Return" actions.
+     *
+     * @param reason human-readable reason for game end
+     */
     private void endGame(String reason) {
         roundActive = false;
         animating = false;
@@ -259,6 +317,9 @@ public class TargetGameController {
         statusLabel.setText(finalMsg);
     }
 
+    /**
+     * Initializes and starts the per-frame animation loop for the projectile.
+     */
     private void startAnimation() {
         animating = true;
         t = 0.0;
@@ -274,7 +335,7 @@ public class TargetGameController {
                     lastNanos = now;
                     return;
                 }
-                double dt = (now - lastNanos) / 1000000000.0;
+                double dt = (now - lastNanos) / 1_000_000_000.0;
                 lastNanos = now;
                 step(dt);
             }
@@ -282,6 +343,10 @@ public class TargetGameController {
         timer.start();
     }
 
+    /**
+     * Advances the simulation by {@code dt} seconds, draws the projectile,
+     * and checks for ground or wall/target collisions to end the round.
+     */
     private void step(double dt) {
         t += dt;
 
@@ -297,14 +362,15 @@ public class TargetGameController {
         drawWorld();
         drawBall(x_px, y_px);
 
+        // Ground collision
         if (y_px + ballRadius_px >= groundY_px) {
             timer.stop();
-
             animating = false;
             endRound(false);
             return;
         }
 
+        // Wall/target collision
         if (x_px + ballRadius_px >= wallX_px) {
             double targetCenterY_px = groundY_px - (targetY_m * ppm);
             boolean withinTarget = TargetPhysics.isHit(y_px, targetCenterY_px, targetRadius_px);
@@ -315,6 +381,9 @@ public class TargetGameController {
         }
     }
 
+    /**
+     * Draws the static game world (background, ground, wall, target, launcher).
+     */
     private void drawWorld() {
         GraphicsContext g2 = canvas.getGraphicsContext2D();
         double W = canvas.getWidth();
@@ -335,24 +404,60 @@ public class TargetGameController {
         g2.setStroke(Color.web("#0066CC"));
         g2.setLineWidth(3);
         double targetCenterY_px = groundY_px - (targetY_m * ppm);
-        g2.strokeOval(wallX_px - targetRadius_px,targetCenterY_px - targetRadius_px,targetRadius_px * 2, targetRadius_px * 2);
+        g2.strokeOval(wallX_px - targetRadius_px, targetCenterY_px - targetRadius_px, targetRadius_px * 2, targetRadius_px * 2);
 
         double x0_px = x0_m * ppm;
         double y0_px = groundY_px - (y0_m * ppm);
-
 
         g2.setFill(Color.BLACK);
         g2.fillOval(x0_px - 3, y0_px - 3, 6, 6);
     }
 
+    /**
+     * Draws the projectile (ball) at the given pixel position.
+     */
     private void drawBall(double x_px, double y_px) {
         GraphicsContext g2 = canvas.getGraphicsContext2D();
         g2.setFill(Color.web("#E53935"));
-        g2.fillOval(x_px - ballRadius_px, y_px - ballRadius_px,ballRadius_px * 2, ballRadius_px * 2);
+        g2.fillOval(x_px - ballRadius_px, y_px - ballRadius_px, ballRadius_px * 2, ballRadius_px * 2);
     }
 
+    /**
+     * Updates the score/strikes heads-up display.
+     */
     private void updateHud() {
         scoreLabel.setText("Score: " + score);
         strikesLabel.setText("Strikes: " + strikes + " / 3");
     }
+
+    /**
+     * Test-only: allows injecting a {@link GameService} and {@link User}.
+     */
+    void setTestDependencies(GameService svc, User user) {
+        this.gameService = svc;
+        this.currentUser = user;
+    }
+
+    /**
+     * Test-only: allows injecting UI controls and canvas.
+     */
+    void setTestUI(Label score, Label strikes, Label status, Label question,
+                   TextField answer, Button fire, Button next, Button newGame,
+                   Button ret, Canvas canv) {
+        this.scoreLabel = score;
+        this.strikesLabel = strikes;
+        this.statusLabel = status;
+        this.questionLabel = question;
+        this.answerField = answer;
+        this.fireBtn = fire;
+        this.nextBtn = next;
+        this.newGameBtn = newGame;
+        this.returnBtn = ret;
+        this.canvas = canv;
+    }
+
+    // Expose methods for tests
+    void testHandleFire() { handleFire(); }
+    void testHandleNext() { handleNext(); }
+    void testHandleNewGame() { handleNewGame(); }
 }

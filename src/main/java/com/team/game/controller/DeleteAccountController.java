@@ -13,6 +13,13 @@ import java.net.URL;
 import java.util.Optional;
 import java.util.ResourceBundle;
 
+/**
+ * Controller for the Delete Account dialog/view.
+ * <p>
+ * Handles final account deletion confirmation and user interaction.
+ * Requires the user to type "DELETE" and confirm through a modal alert.
+ * Delegates the actual deletion logic to {@link GameService}.
+ */
 public class DeleteAccountController implements Initializable {
 
     @FXML
@@ -33,6 +40,10 @@ public class DeleteAccountController implements Initializable {
     private GameService gameService;
     private User currentUser;
 
+    /**
+     * JavaFX lifecycle hook. Initializes the current user and service from {@code Main.MenuApp}
+     * and updates the UI label to display the current user’s details.
+     */
     @Override
     public void initialize(URL location, ResourceBundle resources) {
         gameService = Main.MenuApp.getGameService();
@@ -45,6 +56,15 @@ public class DeleteAccountController implements Initializable {
         confirmationField.setOnAction(this::handleDeleteAccount);
     }
 
+    /**
+     * Handles account deletion when the user confirms with the keyword "DELETE".
+     * <p>
+     * Displays a final confirmation dialog before calling
+     * {@link GameService#deleteUser(User)}. On success, a final message is shown
+     * and the application exits.
+     *
+     * @param actionEvent the originating UI event
+     */
     @FXML
     public void handleDeleteAccount(ActionEvent actionEvent) {
         String confirmation = confirmationField.getText().trim();
@@ -80,12 +100,21 @@ public class DeleteAccountController implements Initializable {
         }
     }
 
+    /**
+     * Closes the window when the user cancels the deletion.
+     *
+     * @param actionEvent the originating UI event
+     */
     @FXML
     public void handleCancel(ActionEvent actionEvent) {
         System.out.println("Account deletion cancelled");
         closeWindow();
     }
 
+    /**
+     * Displays a final information alert confirming successful deletion
+     * before the app closes.
+     */
     private void showFinalDeletionMessage() {
         Alert infoAlert = new Alert(Alert.AlertType.INFORMATION);
         infoAlert.setTitle("Account Deleted");
@@ -96,6 +125,12 @@ public class DeleteAccountController implements Initializable {
         infoAlert.showAndWait();
     }
 
+    /**
+     * Updates the status label with a styled message.
+     *
+     * @param message   text to display
+     * @param isSuccess true for success style, false for error style
+     */
     private void showStatus(String message, boolean isSuccess) {
         statusLabel.setText(message);
         statusLabel.setVisible(true);
@@ -107,6 +142,9 @@ public class DeleteAccountController implements Initializable {
         }
     }
 
+    /**
+     * Utility to close the current stage (window).
+     */
     private void closeWindow() {
         Stage stage = (Stage) cancelButton.getScene().getWindow();
         stage.close();

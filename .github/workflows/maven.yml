@@ -2,9 +2,9 @@ name: Java CI with Maven
 
 on:
   push:
-    branches: [ "integration" ]
+    branches: [ "main" ]
   pull_request:
-    branches: [ "integration" ]
+    branches: [ "main" ]
 
 jobs:
   build:
@@ -26,8 +26,8 @@ jobs:
             mvn -N org.apache.maven.plugins:maven-wrapper-plugin:3.2.0:wrapper -Dmaven=3.9.9
           fi
           chmod +x mvnw
-      
-      
+
+
 
       - name: Start headless display
         uses: pyvista/setup-headless-display-action@v3
@@ -36,3 +36,11 @@ jobs:
 
       - name: Build with Maven
         run: ./mvnw -B -e -DskipTests=false package
+
+      - name: Generate Javadoc
+        run: mvn javadoc:javadoc
+
+      - name: Publish Javadoc
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+            folder: target/docs/javadoc

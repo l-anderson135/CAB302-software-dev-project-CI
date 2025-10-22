@@ -25,32 +25,26 @@ import java.util.List;
 import java.util.Objects;
 import java.util.ResourceBundle;
 
+/**
+ * Controller for the Trigonometry mini-game.
+ * <p>
+ * Handles question display, answer checking, scoring, timing, and database
+ * integration through {@link GameService}. This game challenges players
+ * with trigonometric problems drawn from {@link QuestionBank}, tracking
+ * their progress, accuracy, and performance within a time limit.
+ */
 public class TrigoFunController implements Initializable {
-    @FXML
-    private Label scoreLabel;
 
-    @FXML
-    private Label timeLabel;
+    @FXML private Label scoreLabel;
+    @FXML private Label timeLabel;
+    @FXML private Label questionLabel;
+    @FXML private ImageView questionImage;
+    @FXML private ImageView clockImage;
+    @FXML private TextField answerField;
+    @FXML private Label feedbackLabel;
+    @FXML private Button newGameButton;
 
-    @FXML
-    private Label questionLabel;
-
-    @FXML
-    private ImageView questionImage;
-
-    @FXML
-    private ImageView clockImage;
-
-    @FXML
-    private TextField answerField;
-
-    @FXML
-    private Label feedbackLabel;
-
-    @FXML
-    private Button newGameButton;
-
-    // List of questions from QuestionBank
+    // Question bank and list of questions
     private List<Question> gameQuestions;
     private QuestionBank questionBank;
 
@@ -62,64 +56,82 @@ public class TrigoFunController implements Initializable {
     // Game state variables
     private int currentQuestionIndex = 0;
     private int totalScore = 0;
-    private int wrongStrikes = 0; // Changed: Track consecutive wrong answers (strikes)
-    private int highestConsecutiveCorrect = 0; // Changed: Track highest consecutive correct for stats
-    private int currentConsecutiveCorrect = 0; // Changed: Track current consecutive correct
+    private int wrongStrikes = 0;                // Tracks consecutive wrong answers
+    private int highestConsecutiveCorrect = 0;   // Tracks best streak
+    private int currentConsecutiveCorrect = 0;   // Tracks ongoing correct streak
     private Question currentQuestion;
 
     // Timer variables
     private Timeline gameTimer;
-    private int timeRemaining = 300;
+    private int timeRemaining = 300;             // 5-minute timer
     private boolean gameActive = true;
 
+    /**
+     * Called automatically when the FXML is loaded.
+     * <p>
+     * Initializes the game by linking to the logged-in user,
+     * loading questions, starting a session, and beginning the timer.
+     */
     @Override
     public void initialize(URL location, ResourceBundle resources) {
-        // Get the logged-in user and GameService from Main
         initializeFromLogin();
-
-        // Load the clock image when the controller is initialized
         loadClockImage();
-
-        // Initialize questions from QuestionBank
         initializeQuestionsFromBank();
-
-        // Start a new game session in the database
         startGameSession();
-
-        // Display the first question
         displayCurrentQuestion();
-
-        // Start the game timer
         startGameTimer();
     }
 
-    // Add a method for testing or dependency injection
+    /**
+     * Injects the {@link GameService} and {@link User} for testing or manual setup.
+     *
+     * @param gameService active service façade
+     * @param currentUser authenticated user (may be {@code null} in edge flows)
+     */
     public void setDependencies(GameService gameService, User currentUser) {
         this.gameService = gameService;
         this.currentUser = currentUser;
     }
 
-    // Method to get the logged-in user and GameService from Main.java
+    /**
+     * Retrieves the active {@link GameService} and {@link User}.
+     * <p>
+     * Prefers dependencies already injected via {@link #setDependencies(GameService, User)}
+     * (useful for tests). If missing, falls back to {@link Main.TrigoApp}.
+     * Always touches {@code currentUser.getUsername()} to confirm wiring.
+     */
     public void initializeFromLogin() {
-        try {
-            this.gameService = Main.TrigoApp.getGameService();
-            this.currentUser = Main.TrigoApp.getCurrentUser();
-        } catch (Exception e) {
-            System.err.println("Error initializing from login: " + e.getMessage());
+        // Only fall back to Main.TrigoApp if a dependency wasn't injected
+        if (this.gameService == null || this.currentUser == null) {
+            try {
+                if (this.gameService == null) {
+                    this.gameService = Main.TrigoApp.getGameService();
+                }
+                if (this.currentUser == null) {
+                    this.currentUser = Main.TrigoApp.getCurrentUser();
+                }
+            } catch (Exception e) {
+                System.err.println("Error initializing from login: " + e.getMessage());
+            }
         }
 
-        if (currentUser != null) {
-            System.out.println("Using logged-in user: " + currentUser.getUsername());
-        } else {
-            System.err.println("No user logged in! This should not happen.");
-        }
-
-        if (gameService == null) {
+        if (this.gameService == null) {
             System.err.println("GameService not available! This should not happen.");
+            return;
         }
+        if (this.currentUser == null) {
+            System.err.println("No user logged in! This should not happen.");
+            return;
+        }
+
+        // Touch the username so tests can verify the interaction
+        String username = this.currentUser.getUsername();
+        System.out.println("Using logged-in user: " + username);
     }
 
-    // Method to start a new game session in the database
+    /**
+     * Starts a new game session in the database for the current user.
+     */
     private void startGameSession() {
         if (gameService != null && currentUser != null) {
             try {
@@ -132,17 +144,18 @@ public class TrigoFunController implements Initializable {
         }
     }
 
-    // Method to initialize questions from QuestionBank
+    /**
+     * Loads all trigonometry-related questions from {@link QuestionBank}.
+     */
     private void initializeQuestionsFromBank() {
         questionBank = new QuestionBank();
-        gameQuestions = new ArrayList<>();
-
-        gameQuestions.addAll(questionBank.getTrigo());
-
+        gameQuestions = new ArrayList<>(questionBank.getTrigo());
         System.out.println("Loaded " + gameQuestions.size() + " questions from QuestionBank");
     }
 
-    // Method to load the clock image
+    /**
+     * Loads and displays the clock image in the UI.
+     */
     private void loadClockImage() {
         try {
             String imagePath = "/images/clock1.png";
@@ -155,7 +168,11 @@ public class TrigoFunController implements Initializable {
         }
     }
 
-    // Method to load an image from the main.resources/images folder
+    /**
+     * Loads an image for the current question from {@code /images/}.
+     *
+     * @param imageName the filename of the image to load
+     */
     public void loadQuestionImage(String imageName) {
         try {
             String imagePath = "/images/" + imageName;
@@ -169,35 +186,36 @@ public class TrigoFunController implements Initializable {
         }
     }
 
+    /**
+     * Handles submission of a user’s answer.
+     * <p>
+     * Validates input, checks correctness, updates the score,
+     * saves results to the database, and transitions to the next question.
+     */
     @FXML
     public void handleSubmitAnswer(ActionEvent actionEvent) {
-
-        if (!gameActive) {
-            return;
-        }
+        if (!gameActive) return;
 
         String userAnswer = answerField.getText().trim();
-
         if (userAnswer.isEmpty()) {
             feedbackLabel.setText("Please enter an answer!");
             feedbackLabel.setStyle("-fx-text-fill: orange; -fx-font-size: 18px; -fx-font-weight: bold;");
             return;
         }
 
-        // Check if the answer is correct
+        // Evaluate answer correctness
         if (isAnswerCorrect(userAnswer, currentQuestion.getAnswer())) {
             totalScore++;
             currentConsecutiveCorrect++;
-            wrongStrikes = 0; // Reset strikes on correct answer
+            wrongStrikes = 0;
             updateScoreDisplay();
             feedbackLabel.setText("Correct!");
             feedbackLabel.setStyle("-fx-text-fill: green; -fx-font-size: 18px; -fx-font-weight: bold;");
 
-            // Save correct answer to database
+            // Save correct result
             if (gameService != null && currentGameSession != null) {
                 try {
                     gameService.submitCorrect(currentGameSession);
-                    System.out.println("Saved correct answer to database. Session ID: " + currentGameSession.getId() + ", Consecutive correct: " + currentConsecutiveCorrect);
                 } catch (Exception e) {
                     System.err.println("Failed to save correct answer: " + e.getMessage());
                 }
@@ -207,33 +225,29 @@ public class TrigoFunController implements Initializable {
                 highestConsecutiveCorrect = currentConsecutiveCorrect;
             }
             currentConsecutiveCorrect = 0;
-            wrongStrikes++; // Increment wrong strikes
+            wrongStrikes++;
             feedbackLabel.setText("Wrong! Correct answer: " + currentQuestion.getAnswer() + " (Strikes: " + wrongStrikes + "/3)");
             feedbackLabel.setStyle("-fx-text-fill: red; -fx-font-size: 18px; -fx-font-weight: bold;");
 
             if (gameService != null && currentGameSession != null) {
                 try {
                     gameService.submitWrong(currentGameSession);
-                    System.out.println("Saved wrong answer to database. Session ID: " + currentGameSession.getId() + ", Wrong strikes: " + wrongStrikes);
                 } catch (Exception e) {
                     System.err.println("Failed to save wrong answer: " + e.getMessage());
                 }
             }
 
-            // Check if 3 strikes reached
+            // End game if 3 strikes reached
             if (wrongStrikes >= 3) {
                 endGame("Game Over - 3 Strikes! Final Score: " + totalScore + "/" + currentQuestionIndex);
                 return;
             }
         }
 
-        // Clear the answer field
+        // Clear field and move to next question
         answerField.clear();
-
-        // Move to next question after a short delay
         currentQuestionIndex++;
         if (currentQuestionIndex < gameQuestions.size()) {
-            // Use Timeline to delay showing next question
             Timeline timeline = new Timeline(
                     new KeyFrame(Duration.seconds(2), e -> {
                         if (gameActive) {
@@ -244,64 +258,79 @@ public class TrigoFunController implements Initializable {
             );
             timeline.play();
         } else {
-            // Game finished - all questions completed
             endGame("Game Finished! Final Score: " + totalScore + "/" + gameQuestions.size());
         }
     }
 
-    // Method to display the current question
+    /**
+     * Displays the current question and its options, if available.
+     */
     private void displayCurrentQuestion() {
         if (currentQuestionIndex < gameQuestions.size()) {
             currentQuestion = gameQuestions.get(currentQuestionIndex);
             questionLabel.setText("Question " + (currentQuestionIndex + 1) + ": " + currentQuestion.getText());
 
             if (currentQuestion.getOptions() != null && !currentQuestion.getOptions().isEmpty()) {
-                // If there are options, display them.
-                StringBuilder optionsText = new StringBuilder("Choices: \n");
-                for (int i = 0 ; i < currentQuestion.getOptions().size(); i++) {
-                    optionsText.append("\t").append((char)('A' + i)).append(". ").append(currentQuestion.getOptions().get(i)).append("\n");
+                StringBuilder optionsText = new StringBuilder("Choices:\n");
+                for (int i = 0; i < currentQuestion.getOptions().size(); i++) {
+                    optionsText.append("\t").append((char) ('A' + i))
+                            .append(". ").append(currentQuestion.getOptions().get(i)).append("\n");
                 }
                 questionLabel.setText(questionLabel.getText() + "\n" + optionsText);
             }
-            loadQuestionImage("triangle.png"); // Load default triangle image
+
+            loadQuestionImage("triangle.png"); // Default diagram for trig questions
         }
     }
 
-    // Method to check if the answer is correct (with some flexibility for different formats)
+    /**
+     * Compares user and correct answers after normalization.
+     *
+     * @param userAnswer    raw user input
+     * @param correctAnswer authoritative answer text
+     * @return {@code true} if answers are equivalent after normalization
+     */
     public boolean isAnswerCorrect(String userAnswer, String correctAnswer) {
         String normalizedUserAnswer = normalizeAnswer(userAnswer);
         String normalizedCorrectAnswer = normalizeAnswer(correctAnswer);
-
         return normalizedUserAnswer.equals(normalizedCorrectAnswer);
     }
 
-    // Method to normalize answers for flexible matching
+    /**
+     * Normalizes an answer string to handle whitespace, decimals,
+     * radicals, and equivalent notations for flexible comparison.
+     *
+     * @param answer raw answer text
+     * @return normalized comparison form
+     */
     public String normalizeAnswer(String answer) {
         return answer.toLowerCase()
-                .replaceAll("\\s+", "")  // Remove all whitespace
-                .replace("sqrt(2)/2", "√2/2")  // Handle sqrt notation
+                .replaceAll("\\s+", "")
+                .replace("sqrt(2)/2", "√2/2")
                 .replace("sqrt(3)/3", "√3/3")
                 .replace("sqrt(3)", "√3")
-                .replace("0.5", "1/2")  // Handle decimal equivalents
-                .replace("0.707", "√2/2")  // Approximate decimal for √2/2
-                .replace("1.732", "√3")  // Approximate decimal for √3
-                .replace("0.577", "√3/3");  // Approximate decimal for √3/3
+                .replace("0.5", "1/2")
+                .replace("0.707", "√2/2")
+                .replace("1.732", "√3")
+                .replace("0.577", "√3/3");
     }
 
-    // Method to update the score display
+    /**
+     * Updates the displayed score.
+     */
     private void updateScoreDisplay() {
         scoreLabel.setText("Total Score: " + totalScore);
     }
 
-    // Timer methods
+    /**
+     * Starts the countdown timer and ends the game when time runs out.
+     */
     private void startGameTimer() {
         updateTimeDisplay();
-
         gameTimer = new Timeline(new KeyFrame(Duration.seconds(1), e -> {
             timeRemaining--;
             updateTimeDisplay();
 
-            // Check if time is up
             if (timeRemaining <= 0) {
                 endGame("Time's Up! Final Score: " + totalScore + "/" + gameQuestions.size());
             }
@@ -311,6 +340,10 @@ public class TrigoFunController implements Initializable {
         gameTimer.play();
     }
 
+    /**
+     * Updates the timer label each second and changes its color
+     * as time runs low.
+     */
     private void updateTimeDisplay() {
         int minutes = timeRemaining / 60;
         int seconds = timeRemaining % 60;
@@ -326,43 +359,40 @@ public class TrigoFunController implements Initializable {
         }
     }
 
+    /**
+     * Ends the game, stops the timer, finalizes the session in the database,
+     * and displays the end-of-game message and final score.
+     */
     private void endGame(String message) {
         gameActive = false;
 
-        // Finish the game session in the database
         if (gameService != null && currentGameSession != null) {
             try {
                 gameService.finishRound(currentGameSession);
-                System.out.println("Finished game session in database. Session ID: " + currentGameSession.getId() +
-                        ", Final Score: " + totalScore + ", Highest Consecutive Correct: " + highestConsecutiveCorrect);
+                System.out.println("Finished session " + currentGameSession.getId() + " with score " + totalScore);
             } catch (Exception e) {
                 System.err.println("Failed to finish game session: " + e.getMessage());
             }
         }
 
-        // Stop the timer
-        if (gameTimer != null) {
-            gameTimer.stop();
-        }
+        if (gameTimer != null) gameTimer.stop();
 
-        // Disable input and show New Game button
         answerField.setDisable(true);
         newGameButton.setVisible(true);
 
-        // Show final message
         feedbackLabel.setText(message);
         feedbackLabel.setStyle("-fx-text-fill: blue; -fx-font-size: 20px; -fx-font-weight: bold;");
-
-        // Hide question and image
         questionLabel.setText("Game Over! Click 'New Game' to play again.");
         questionImage.setImage(null);
-
-        System.out.println("Game ended: " + message);
     }
 
+    /**
+     * Handles the “New Game” button action.
+     * <p>
+     * Resets all state variables, restarts the session, and begins a new game cycle.
+     */
     @FXML
     public void handleNewGame(ActionEvent actionEvent) {
-        // Reset all game state variables
         currentQuestionIndex = 0;
         totalScore = 0;
         wrongStrikes = 0;
@@ -371,7 +401,6 @@ public class TrigoFunController implements Initializable {
         timeRemaining = 300;
         gameActive = true;
 
-        // Reset UI elements
         answerField.setDisable(false);
         answerField.clear();
         newGameButton.setVisible(false);
@@ -379,13 +408,8 @@ public class TrigoFunController implements Initializable {
         feedbackLabel.setText("");
         feedbackLabel.setStyle("");
 
-        // Start new game session in database
         startGameSession();
-
-        // Reload and shuffle questions
         initializeQuestionsFromBank();
-
-        // Start the first question and timer
         displayCurrentQuestion();
         startGameTimer();
 

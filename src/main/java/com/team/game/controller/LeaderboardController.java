@@ -17,6 +17,13 @@ import java.net.URL;
 import java.util.List;
 import java.util.ResourceBundle;
 
+/**
+ * Controller for the Leaderboard screen.
+ * <p>
+ * Displays the top players for each {@link GameMode}.
+ * Fetches leaderboard data from {@link GameService}, formats it for display,
+ * and allows users to switch between different game mode leaderboards.
+ */
 public class LeaderboardController implements Initializable {
 
     @FXML
@@ -54,6 +61,10 @@ public class LeaderboardController implements Initializable {
 
     private GameService gameService;
 
+    /**
+     * JavaFX lifecycle hook.
+     * Initializes the leaderboard table columns and binds them to data properties.
+     */
     @Override
     public void initialize(URL location, ResourceBundle resources) {
         gameService = Main.MenuApp.getGameService();
@@ -63,24 +74,45 @@ public class LeaderboardController implements Initializable {
         highScoreColumn.setCellValueFactory(new PropertyValueFactory<>("highScore"));
     }
 
+    /**
+     * Displays the leaderboard for the Basics game mode.
+     *
+     * @param actionEvent the originating UI event
+     */
     @FXML
     public void handleBasicsLeaderboard(ActionEvent actionEvent) {
         System.out.println("Basics leaderboard selected");
         loadLeaderboard(GameMode.BASICS);
     }
 
+    /**
+     * Displays the leaderboard for the Trig game mode.
+     *
+     * @param actionEvent the originating UI event
+     */
     @FXML
     public void handleTrigLeaderboard(ActionEvent actionEvent) {
         System.out.println("Trig leaderboard selected");
         loadLeaderboard(GameMode.TRIG);
     }
 
+    /**
+     * Displays the leaderboard for the Target game mode.
+     *
+     * @param actionEvent the originating UI event
+     */
     @FXML
     public void handleTargetLeaderboard(ActionEvent actionEvent) {
         System.out.println("Target leaderboard selected");
         loadLeaderboard(GameMode.TARGET);
     }
 
+    /**
+     * Loads leaderboard data for the specified game mode from {@link GameService}.
+     * If no data exists, displays a "no scores" message.
+     *
+     * @param mode the game mode whose leaderboard should be displayed
+     */
     private void loadLeaderboard(GameMode mode) {
         if (gameService == null) {
             showNoScores();
@@ -100,6 +132,11 @@ public class LeaderboardController implements Initializable {
         }
     }
 
+    /**
+     * Populates the leaderboard table with player rankings and scores.
+     *
+     * @param scoreRows list of scores retrieved from the service
+     */
     private void showLeaderboard(List<ScoreRow> scoreRows) {
         noScoresLabel.setVisible(false);
 
@@ -116,35 +153,62 @@ public class LeaderboardController implements Initializable {
         leaderboardTable.setVisible(true);
     }
 
+    /**
+     * Displays a message indicating that no scores were found.
+     */
     private void showNoScores() {
         leaderboardTable.setVisible(false);
         noScoresLabel.setVisible(true);
     }
 
+    /**
+     * Closes the leaderboard window and returns to the previous screen.
+     *
+     * @param actionEvent the originating UI event
+     */
     @FXML
     public void handleBack(ActionEvent actionEvent) {
         System.out.println("Back to menu");
         closeWindow();
     }
 
+    /**
+     * Utility method to close the current stage (window).
+     */
     private void closeWindow() {
         Stage stage = (Stage) backButton.getScene().getWindow();
         stage.close();
     }
 
+    /**
+     * Represents a single row in the leaderboard table.
+     * Stores a player’s rank, username, and high score.
+     */
     public static class LeaderboardRow {
         private Integer rank;
         private String username;
         private Integer highScore;
 
+        /**
+         * Constructs a leaderboard row entry.
+         *
+         * @param rank       the player’s position
+         * @param username   the player’s username
+         * @param highScore  the player’s top score
+         */
         public LeaderboardRow(Integer rank, String username, Integer highScore) {
             this.rank = rank;
             this.username = username;
             this.highScore = highScore;
         }
 
+        /** @return the player’s rank in the leaderboard */
         public Integer getRank() { return rank; }
+
+        /** @return the player’s username */
         public String getUsername() { return username; }
+
+        /** @return the player’s highest score */
         public Integer getHighScore() { return highScore; }
 
         public void setRank(Integer rank) { this.rank = rank; }
